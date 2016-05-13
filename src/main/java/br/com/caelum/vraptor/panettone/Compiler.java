@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 public class Compiler {
 
@@ -39,10 +40,11 @@ public class Compiler {
 	}
 
 	public List<Exception> compileAll() {
-		List<File> files = tonesAt(from);
+		List<File> tones = tonesAt(from);
 		long start = System.currentTimeMillis();
-		out.println("Compiling " + files.size() + " files...");
-		List<Exception> exceptions = files.stream()
+		out.println("Compiling " + tones.size() + " files...");
+		deleteJavaFilesFromTonesThatWereDeleted(tones);
+		List<Exception> exceptions = tones.stream()
 			.map(this::compile)
 			.filter(Optional::isPresent)
 			.map(Optional::get)
@@ -54,6 +56,20 @@ public class Compiler {
 		}
 		out.println(format("Finished in %.2f secs", delta));
 		return exceptions;
+	}
+
+	private void deleteJavaFilesFromTonesThatWereDeleted(List<File> tones) {
+		List<File> toBeDeleted = javaFilesAt(to);
+		toBeDeleted.removeIf(toneStillExists(tones));
+		toBeDeleted.forEach(p -> p.delete());
+	}
+
+	private Predicate<File> toneStillExists(List<File> files) {
+		return (compiled) -> files.stream().anyMatch(f -> getNameWithoutExtention(f).equals(getNameWithoutExtention(compiled)));
+	}
+
+	private String getNameWithoutExtention(File file) {
+		return file.getName().split("\\.")[0];
 	}
 
 	public Optional<Exception> compile(File f) {
@@ -82,19 +98,31 @@ public class Compiler {
 	}
 
 	private List<File> tonesAt(File currentDir) {
+		return filesOfAKindAt(currentDir, this::isTone);
+	}
+
+	private List<File> javaFilesAt(File currentDir) {
+		return filesOfAKindAt(currentDir, this::isJava);
+	}
+
+	private List<File> filesOfAKindAt(File currentDir, Predicate<File> condition){
 		try {
-			List<File> tones = Files.walk(currentDir.toPath(), 10)
+			List<File> files = Files.walk(currentDir.toPath(), 10)
 					.map(Path::toFile)
-					.filter(this::isTone)
+					.filter(condition)
 					.collect(toList());
-			return tones.stream().filter(File::isFile).collect(toList());
+			return files.stream().filter(File::isFile).collect(toList());
 		} catch (IOException e) {
 			throw new CompilationIOException(e);
 		}
 	}
-	
+
 	private boolean isTone(File p) {
 		return p.isDirectory() ||  p.getName().endsWith(".tone") || p.getName().contains(".tone.");
+	}
+
+	private boolean isJava(File f){
+		return f.isDirectory() || f.getName().endsWith(".java");
 	}
 
 	private String noExtension(String name) {

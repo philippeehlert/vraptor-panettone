@@ -112,4 +112,26 @@ public class CompilerTest {
 		compiler.removeJavaVersionOf(SRC + "/B.tone");
 		assertFalse(targetB.exists());
 	}
+
+	@Test
+	public void shouldDeleteJavaFilesForTonesThatWereDeleted(){
+		File toneToBeDeleted = new File(sources, "deleteMePlease.tone.html");
+		io.copy("<html>Oi<%= \"hello\" %></html>", toneToBeDeleted);
+
+		File toneDashboard = new File(sources, "dashboard.tone.html");
+		io.copy("<html>Oi<%= \"dashboard\" %></html>", toneDashboard);
+		compiler.compileAll();
+
+		File preCompiledToBeDeleted = new File(targets, "templates/deleteMePlease.java");
+		assertTrue(preCompiledToBeDeleted.exists());
+
+		File preCompiledDashboard = new File(targets, "templates/dashboard.java");
+		assertTrue(preCompiledDashboard.exists());
+
+		toneToBeDeleted.delete();
+		compiler.compileAll();
+		assertFalse(preCompiledToBeDeleted.exists());
+		assertTrue(preCompiledDashboard.exists());
+	}
+
 }
